@@ -36,7 +36,7 @@
 </head>
 <body>
   <canvas id="game" width="480" height="640"></canvas>
-  <div class="hint">←→ / A D : 移動 &nbsp;・&nbsp; Space : 発射 &nbsp;・&nbsp; R : リスタート</div>
+  <div class="hint">←→ / A D 移動 &nbsp;・&nbsp; Space 発射 &nbsp;・&nbsp; R リスタート &nbsp;・&nbsp; T タイトル</div>
 
 <script>
 (() => {
@@ -45,34 +45,58 @@
   const W = canvas.width;
   const H = canvas.height;
 
+  const DIFFICULTIES = {
+    easy:   { key: '1', label: 'EASY',   color: '#7f7', spawnInit: 1200, spawnMin: 450, spawnDecay: 8,  enemyBase: 50,  enemyVar: 30, enemyTimeBonus: 6,  enemyTimeCap: 80  },
+    normal: { key: '2', label: 'NORMAL', color: '#7cf', spawnInit: 800,  spawnMin: 280, spawnDecay: 12, enemyBase: 70,  enemyVar: 40, enemyTimeBonus: 8,  enemyTimeCap: 120 },
+    hard:   { key: '3', label: 'HARD',   color: '#f77', spawnInit: 500,  spawnMin: 180, spawnDecay: 20, enemyBase: 100, enemyVar: 60, enemyTimeBonus: 12, enemyTimeCap: 200 },
+  };
+  const DIFF_ORDER = ['easy', 'normal', 'hard'];
+
+  let state = 'title';
+  let currentDiff = null;
+  let diff = null;
+  let player, bullets, enemies, stars, score, lastShotAt, lastSpawnAt, spawnInterval, elapsed;
+
   const keys = Object.create(null);
   window.addEventListener('keydown', (e) => {
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
-    keys[e.key.toLowerCase()] = true;
-    if (e.key.toLowerCase() === 'r' && gameOver) reset();
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (state === 'title') {
+      if (k === '1') startGame('easy');
+      else if (k === '2') startGame('normal');
+      else if (k === '3') startGame('hard');
+    } else if (state === 'gameover') {
+      if (k === 'r') startGame(currentDiff);
+      else if (k === 't') state = 'title';
+    }
   });
   window.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
   });
 
-  let player, bullets, enemies, stars, score, gameOver, lastShotAt, lastSpawnAt, spawnInterval, elapsed;
-
-  function reset() {
-    player = { x: W / 2, y: H - 60, w: 28, h: 22, speed: 320 };
-    bullets = [];
-    enemies = [];
+  function initStarfield() {
     stars = Array.from({ length: 80 }, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
       v: 20 + Math.random() * 60,
       r: Math.random() < 0.2 ? 1.5 : 1,
     }));
+  }
+
+  function startGame(diffKey) {
+    currentDiff = diffKey;
+    diff = DIFFICULTIES[diffKey];
+    player = { x: W / 2, y: H - 60, w: 28, h: 22, speed: 320 };
+    bullets = [];
+    enemies = [];
+    initStarfield();
     score = 0;
-    gameOver = false;
     lastShotAt = 0;
     lastSpawnAt = 0;
-    spawnInterval = 800;
+    spawnInterval = diff.spawnInit;
     elapsed = 0;
+    state = 'playing';
   }
 
   function spawnEnemy() {
@@ -81,22 +105,19 @@
       x: Math.random() * (W - w),
       y: -h,
       w, h,
-      speed: 70 + Math.random() * 40 + Math.min(120, elapsed * 8),
+      speed: diff.enemyBase + Math.random() * diff.enemyVar + Math.min(diff.enemyTimeCap, elapsed * diff.enemyTimeBonus),
     });
   }
 
   function update(dt, now) {
-    elapsed += dt;
-
     for (const s of stars) {
       s.y += s.v * dt;
-      if (s.y > H) {
-        s.y = 0;
-        s.x = Math.random() * W;
-      }
+      if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
     }
 
-    if (gameOver) return;
+    if (state !== 'playing') return;
+
+    elapsed += dt;
 
     let dx = 0;
     if (keys['arrowleft'] || keys['a']) dx -= 1;
@@ -115,7 +136,7 @@
       if (bullets[i].y + bullets[i].h < 0) bullets.splice(i, 1);
     }
 
-    spawnInterval = Math.max(280, 800 - elapsed * 12);
+    spawnInterval = Math.max(diff.spawnMin, diff.spawnInit - elapsed * diff.spawnDecay);
     if (now - lastSpawnAt > spawnInterval) {
       spawnEnemy();
       lastSpawnAt = now;
@@ -140,7 +161,7 @@
         continue;
       }
       if (e.y + e.h >= H) {
-        gameOver = true;
+        state = 'gameover';
       }
     }
 
@@ -148,9 +169,16 @@
     const py = player.y - player.h / 2;
     for (const e of enemies) {
       if (px < e.x + e.w && px + player.w > e.x && py < e.y + e.h && py + player.h > e.y) {
-        gameOver = true;
+        state = 'gameover';
         break;
       }
+    }
+  }
+
+  function drawStars() {
+    for (const s of stars) {
+      ctx.fillStyle = s.r > 1 ? '#fff' : '#aaa';
+      ctx.fillRect(s.x, s.y, s.r, s.r);
     }
   }
 
@@ -177,13 +205,64 @@
     ctx.fillRect(e.x + e.w - 8, e.y + 7, 2, 2);
   }
 
+  function drawTitle() {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px monospace';
+    ctx.fillText('SHOOTING GAME', W / 2, 170);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px monospace';
+    ctx.fillText('Select Difficulty', W / 2, 240);
+
+    const startY = 300;
+    const gap = 54;
+    DIFF_ORDER.forEach((key, i) => {
+      const d = DIFFICULTIES[key];
+      ctx.fillStyle = d.color;
+      ctx.font = 'bold 26px monospace';
+      ctx.fillText(`[${d.key}]  ${d.label}`, W / 2, startY + i * gap);
+    });
+
+    ctx.fillStyle = '#666';
+    ctx.font = '12px monospace';
+    ctx.fillText('Move: ← → / A D     Shoot: Space', W / 2, H - 60);
+  }
+
+  function drawHUD() {
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + score, 12, 24);
+    if (diff) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = diff.color;
+      ctx.fillText(diff.label, W - 12, 24);
+    }
+  }
+
+  function drawGameOver() {
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, H / 2 - 80, W, 170);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 32px monospace';
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 20);
+    ctx.font = '16px monospace';
+    ctx.fillText('Score: ' + score, W / 2, H / 2 + 8);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px monospace';
+    ctx.fillText('R: Restart   T: Title', W / 2, H / 2 + 50);
+  }
+
   function draw() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
+    drawStars();
 
-    for (const s of stars) {
-      ctx.fillStyle = s.r > 1 ? '#fff' : '#aaa';
-      ctx.fillRect(s.x, s.y, s.r, s.r);
+    if (state === 'title') {
+      drawTitle();
+      return;
     }
 
     for (const b of bullets) {
@@ -193,25 +272,11 @@
 
     for (const e of enemies) drawEnemy(e);
 
-    if (!gameOver) drawPlayer();
+    if (state === 'playing') drawPlayer();
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '16px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('Score: ' + score, 12, 24);
+    drawHUD();
 
-    if (gameOver) {
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(0, H / 2 - 70, W, 140);
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.font = 'bold 32px monospace';
-      ctx.fillText('GAME OVER', W / 2, H / 2 - 10);
-      ctx.font = '16px monospace';
-      ctx.fillText('Score: ' + score, W / 2, H / 2 + 18);
-      ctx.fillStyle = '#aaa';
-      ctx.fillText('Press R to restart', W / 2, H / 2 + 44);
-    }
+    if (state === 'gameover') drawGameOver();
   }
 
   let lastTime = performance.now();
@@ -224,7 +289,7 @@
     requestAnimationFrame(loop);
   }
 
-  reset();
+  initStarfield();
   requestAnimationFrame((t) => { lastTime = t; loop(t); });
 })();
 </script>
