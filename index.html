@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Shooting Game</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #111;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    user-select: none;
+  }
+  canvas {
+    background: #000;
+    border: 1px solid #333;
+    box-shadow: 0 0 24px rgba(80, 160, 255, 0.2);
+    image-rendering: pixelated;
+  }
+  .hint {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #888;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+  <canvas id="game" width="480" height="640"></canvas>
+  <div class="hint">←→ / A D : 移動 &nbsp;・&nbsp; Space : 発射 &nbsp;・&nbsp; R : リスタート</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const keys = Object.create(null);
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+    keys[e.key.toLowerCase()] = true;
+    if (e.key.toLowerCase() === 'r' && gameOver) reset();
+  });
+  window.addEventListener('keyup', (e) => {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  let player, bullets, enemies, stars, score, gameOver, lastShotAt, lastSpawnAt, spawnInterval, elapsed;
+
+  function reset() {
+    player = { x: W / 2, y: H - 60, w: 28, h: 22, speed: 320 };
+    bullets = [];
+    enemies = [];
+    stars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      v: 20 + Math.random() * 60,
+      r: Math.random() < 0.2 ? 1.5 : 1,
+    }));
+    score = 0;
+    gameOver = false;
+    lastShotAt = 0;
+    lastSpawnAt = 0;
+    spawnInterval = 800;
+    elapsed = 0;
+  }
+
+  function spawnEnemy() {
+    const w = 26, h = 22;
+    enemies.push({
+      x: Math.random() * (W - w),
+      y: -h,
+      w, h,
+      speed: 70 + Math.random() * 40 + Math.min(120, elapsed * 8),
+    });
+  }
+
+  function update(dt, now) {
+    elapsed += dt;
+
+    for (const s of stars) {
+      s.y += s.v * dt;
+      if (s.y > H) {
+        s.y = 0;
+        s.x = Math.random() * W;
+      }
+    }
+
+    if (gameOver) return;
+
+    let dx = 0;
+    if (keys['arrowleft'] || keys['a']) dx -= 1;
+    if (keys['arrowright'] || keys['d']) dx += 1;
+    player.x += dx * player.speed * dt;
+    if (player.x < player.w / 2) player.x = player.w / 2;
+    if (player.x > W - player.w / 2) player.x = W - player.w / 2;
+
+    if (keys[' '] && now - lastShotAt > 200) {
+      bullets.push({ x: player.x - 1.5, y: player.y - 12, w: 3, h: 10, speed: 540 });
+      lastShotAt = now;
+    }
+
+    for (const b of bullets) b.y -= b.speed * dt;
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      if (bullets[i].y + bullets[i].h < 0) bullets.splice(i, 1);
+    }
+
+    spawnInterval = Math.max(280, 800 - elapsed * 12);
+    if (now - lastSpawnAt > spawnInterval) {
+      spawnEnemy();
+      lastSpawnAt = now;
+    }
+
+    for (const e of enemies) e.y += e.speed * dt;
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      let hit = false;
+      for (let j = bullets.length - 1; j >= 0; j--) {
+        const b = bullets[j];
+        if (b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
+          bullets.splice(j, 1);
+          hit = true;
+          break;
+        }
+      }
+      if (hit) {
+        enemies.splice(i, 1);
+        score += 10;
+        continue;
+      }
+      if (e.y + e.h >= H) {
+        gameOver = true;
+      }
+    }
+
+    const px = player.x - player.w / 2;
+    const py = player.y - player.h / 2;
+    for (const e of enemies) {
+      if (px < e.x + e.w && px + player.w > e.x && py < e.y + e.h && py + player.h > e.y) {
+        gameOver = true;
+        break;
+      }
+    }
+  }
+
+  function drawPlayer() {
+    ctx.fillStyle = '#7cf';
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y - player.h / 2);
+    ctx.lineTo(player.x - player.w / 2, player.y + player.h / 2);
+    ctx.lineTo(player.x + player.w / 2, player.y + player.h / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(player.x - 2, player.y - 2, 4, 4);
+  }
+
+  function drawEnemy(e) {
+    ctx.fillStyle = '#f55';
+    ctx.fillRect(e.x, e.y, e.w, e.h);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(e.x + 5, e.y + 6, 4, 4);
+    ctx.fillRect(e.x + e.w - 9, e.y + 6, 4, 4);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(e.x + 6, e.y + 7, 2, 2);
+    ctx.fillRect(e.x + e.w - 8, e.y + 7, 2, 2);
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    for (const s of stars) {
+      ctx.fillStyle = s.r > 1 ? '#fff' : '#aaa';
+      ctx.fillRect(s.x, s.y, s.r, s.r);
+    }
+
+    for (const b of bullets) {
+      ctx.fillStyle = '#ff0';
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    }
+
+    for (const e of enemies) drawEnemy(e);
+
+    if (!gameOver) drawPlayer();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + score, 12, 24);
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, H / 2 - 70, W, 140);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 32px monospace';
+      ctx.fillText('GAME OVER', W / 2, H / 2 - 10);
+      ctx.font = '16px monospace';
+      ctx.fillText('Score: ' + score, W / 2, H / 2 + 18);
+      ctx.fillStyle = '#aaa';
+      ctx.fillText('Press R to restart', W / 2, H / 2 + 44);
+    }
+  }
+
+  let lastTime = performance.now();
+  function loop(now) {
+    let dt = (now - lastTime) / 1000;
+    if (dt > 0.05) dt = 0.05;
+    lastTime = now;
+    update(dt, now);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  reset();
+  requestAnimationFrame((t) => { lastTime = t; loop(t); });
+})();
+</script>
+</body>
+</html>
