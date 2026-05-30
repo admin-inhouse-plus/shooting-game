@@ -333,6 +333,28 @@
     }
   }
 
+  function drawItemLegend() {
+    const n = ITEM_TYPES.length;
+    const sw = 12;
+    const cellW = W / n;
+    const y = H - 18;
+    ctx.font = '11px monospace';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < n; i++) {
+      const t = ITEM_TYPES[i];
+      const cx = i * cellW + 8;
+      ctx.fillStyle = t.color;
+      ctx.fillRect(cx, y - sw / 2, sw, sw);
+      ctx.fillStyle = '#000';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.label, cx + sw / 2, y + 1);
+      ctx.fillStyle = '#bbb';
+      ctx.textAlign = 'left';
+      ctx.fillText(t.name, cx + sw + 4, y + 1);
+    }
+    ctx.textBaseline = 'alphabetic';
+  }
+
   function drawGameOver() {
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(0, H / 2 - 80, W, 170);
@@ -378,6 +400,7 @@
     if (state === 'playing') drawPlayer();
 
     drawHUD();
+    drawItemLegend();
 
     if (state === 'gameover') drawGameOver();
   }
