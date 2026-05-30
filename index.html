@@ -53,11 +53,11 @@
   const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
   const ITEM_TYPES = [
-    { key: 'wide',   color: '#fc6', label: 'W', name: 'WIDE'   },
-    { key: 'spread', color: '#f6f', label: 'S', name: 'SPREAD' },
-    { key: 'rapid',  color: '#6cf', label: 'R', name: 'RAPID'  },
-    { key: 'pierce', color: '#ff6', label: 'P', name: 'PIERCE' },
-    { key: 'shield', color: '#6f6', label: 'H', name: 'SHIELD' },
+    { key: 'wide',   color: '#fc6', label: 'W', name: 'WIDE',   desc: '弾が太くなる'       },
+    { key: 'spread', color: '#f6f', label: 'S', name: 'SPREAD', desc: '3方向に発射'        },
+    { key: 'rapid',  color: '#6cf', label: 'R', name: 'RAPID',  desc: '連射速度アップ'     },
+    { key: 'pierce', color: '#ff6', label: 'P', name: 'PIERCE', desc: '弾が敵を貫通'       },
+    { key: 'shield', color: '#6f6', label: 'H', name: 'SHIELD', desc: '被弾を1回防ぐ'      },
   ];
   const POWER_DURATION = 10;
   const GOLD_CHANCE = 0.1;
@@ -298,9 +298,32 @@
       ctx.fillText(`[${d.key}]  ${d.label}`, W / 2, startY + i * gap);
     });
 
+    ctx.fillStyle = '#aaa';
+    ctx.font = '13px monospace';
+    ctx.fillText('ITEMS', W / 2, 470);
+
+    const guideX = 120;
+    const sw = 16;
+    ITEM_TYPES.forEach((t, i) => {
+      const y = 492 + i * 22;
+      ctx.fillStyle = t.color;
+      ctx.fillRect(guideX, y - sw / 2, sw, sw);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.label, guideX + sw / 2, y + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#ddd';
+      ctx.font = '13px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${t.name} … ${t.desc}`, guideX + sw + 10, y + 4);
+    });
+
+    ctx.textAlign = 'center';
     ctx.fillStyle = '#666';
     ctx.font = '12px monospace';
-    ctx.fillText('Move: ← → / A D     Shoot: Space', W / 2, H - 60);
+    ctx.fillText('Move: ← → / A D     Shoot: Space', W / 2, H - 28);
   }
 
   function drawHUD() {
